@@ -1,168 +1,200 @@
-# NGO-Food-Suplier
-FoodBridge is an intelligent NGO food supply system designed to reduce food wastage by connecting donors and NGOs. The platform uses priority calculation and Greedy Algorithms to allocate available food efficiently, ensuring fair distribution and maximizing social impact through technology.
-# FoodBridge – Intelligent Food Distribution System for NGOs
+# 🌾 FoodBridge - NGO Food Supply Network
 
-## Introduction
+[![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://isocpp.org/)
+[![JavaScript](https://img.shields.io/badge/JavaScript-ES6-yellow.svg)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![Leaflet](https://img.shields.io/badge/Leaflet-1.9.4-green.svg)](https://leafletjs.com/)
+[![License](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE)
 
-Food wastage is one of the most significant challenges faced by society today. Every day, large quantities of edible food are discarded by hostels, restaurants, mess facilities, event organizers, and households. At the same time, many NGOs and charitable organizations struggle to provide adequate meals to underprivileged communities due to limited resources and irregular donations.
+> **An intelligent food distribution network using priority-based greedy algorithms to connect surplus food with those who need it most.**
 
-FoodBridge was developed as a technology-driven solution to address this gap. The platform creates a digital ecosystem where food suppliers can easily donate surplus food and NGOs can receive food based on their needs and priority. By automating the allocation process, the system ensures that available resources are utilized efficiently and reach the organizations that can create the maximum social impact.
+---
 
-The project combines web technologies with algorithmic decision-making to build a transparent, scalable, and efficient food distribution network.
+## 🌟 Overview
 
-## Problem Statement
+**FoodBridge** is a comprehensive NGO food supply management system that optimizes food distribution using priority-based algorithms. The system connects food donors (hostels, restaurants, events) with NGOs, ensuring that food reaches the most urgent beneficiaries first.
 
-Traditional food donation systems often face several challenges:
+### 🎯 Problem Statement
+- Food wastage is a global issue
+- NGOs often lack efficient distribution systems
+- Manual allocation is time-consuming and suboptimal
 
-- Lack of communication between food donors and NGOs
-- Manual allocation of food resources
-- Unequal distribution of available food
-- Difficulty in identifying the most deserving NGO
-- Absence of centralized tracking and monitoring
-- Significant food wastage due to delayed distribution
+### 💡 Solution
+- Automated priority calculation based on urgency and beneficiaries
+- Greedy allocation algorithm for optimal food distribution
+- Interactive map interface for real-time NGO tracking
+- C++ backend for high-performance computations
 
-These challenges result in inefficient utilization of donated food and reduced social impact.
+---
 
-FoodBridge aims to solve these issues through a centralized platform that intelligently manages donations and food allocation.
+## ✨ Features
 
-## Project Objective
+### 🗺️ Interactive Map (Dehradun - Clement Town)
+- **Real-time NGO visualization** with color-coded markers
+- **Priority-based coloring**:
+  - 🟣 Purple - Newly added NGOs
+  - 🔴 Red - High priority (800+ score)
+  - 🟡 Orange - Medium priority (500-799)
+  - 🟢 Green - Low-medium priority (300-499)
+  - 🔵 Blue - Low priority (<300)
+- **Locality labels** for easy identification
+- **Click to view** complete NGO details
+- **Zoom and pan** for detailed exploration
 
-The primary objective of FoodBridge is to reduce food wastage and improve food accessibility for NGOs by providing an automated and data-driven food distribution system.
+### 🏢 NGO Management
+- ✅ **Valid NGO verification** - Only pre-approved NGOs can register
+- 📊 **Priority score calculation** using C++ algorithms
+- 🔍 **Search and filter** functionality
+- 📋 **Sortable table** with all NGO details
+- 🗑️ **Delete NGOs** from the system
 
-The project focuses on:
+### 🍱 Food Donation Management
+- 📝 **Record donations** from suppliers
+- 📊 **Track food stock** in real-time
+- 📈 **View donation history** with timestamps
 
-- Connecting food suppliers with NGOs
-- Creating transparency in food distribution
-- Prioritizing NGOs based on actual requirements
-- Reducing manual intervention in allocation decisions
-- Ensuring fair and efficient distribution of resources
-- Demonstrating the practical implementation of Data Structures and Algorithms in a real-world social problem
+### ⚡ Allocation Engine
+- 🎯 **Greedy allocation algorithm** (O(n) time complexity)
+- 📊 **Multiple sorting algorithms**:
+  - QuickSort - O(n log n)
+  - MergeSort - O(n log n)
+  - HeapSort - O(n log n)
+  - BubbleSort - O(n²)
+  - SelectionSort - O(n²)
+  - InsertionSort - O(n²)
+- 📈 **Real-time allocation results** with status
+- 📊 **Efficiency metrics** and summaries
 
-## System Overview
+### 📋 Reports & Analytics
+- 📄 **Generate comprehensive reports**
+- 📊 **System statistics** dashboard
+- 📈 **Complexity analysis** visualization
+- 🖨️ **Print reports** for documentation
 
-FoodBridge consists of three major stakeholders:
+---
 
-### Food Suppliers
+## 🛠️ Tech Stack
 
-Food suppliers such as hostels, restaurants, canteens, and event organizers can register available food details on the platform. Information such as food quantity, availability, and expiry time can be submitted through the system.
+### Backend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| C++ | 17 | Core algorithms and server logic |
+| cpp-httplib | Latest | HTTP server for API endpoints |
+| JSON | - | Data interchange format |
 
-### NGOs
+### Frontend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| HTML5 | - | Structure |
+| CSS3 | - | Styling and animations |
+| JavaScript | ES6 | Frontend logic and interactivity |
+| Leaflet | 1.9.4 | Interactive maps |
+| OpenStreetMap | - | Map tiles |
 
-NGOs can register themselves and provide details regarding:
+### Algorithms Implemented
+| Algorithm | Type | Complexity |
+|-----------|------|------------|
+| Priority Calculator | Custom | O(n) |
+| Greedy Allocation | Greedy | O(n) |
+| QuickSort | Sorting | O(n log n) |
+| MergeSort | Sorting | O(n log n) |
+| HeapSort | Sorting | O(n log n) |
+| BubbleSort | Sorting | O(n²) |
+| SelectionSort | Sorting | O(n²) |
+| InsertionSort | Sorting | O(n²) |
+| Binary Search | Search | O(log n) |
+| Linear Search | Search | O(n) |
 
-- Number of beneficiaries
-- Current food requirements
-- Urgency level
-- Available resources
+---
 
-This information is used to calculate priority scores.
+## 🏗️ Architecture
+┌─────────────────────────────────────────────────────────────┐
+│ FRONTEND (Browser) │
+├─────────────────────────────────────────────────────────────┤
+│ index.html │ style.css │ app.js │ Leaflet Map │
+├─────────────────────────────────────────────────────────────┤
+│ HTTP API Calls │
+├─────────────────────────────────────────────────────────────┤
+│ C++ BACKEND SERVER (cpp-httplib) │
+├─────────────────────────────────────────────────────────────┤
+│ ApiHandler │ PriorityCalculator │ GreedyAllocation │
+│ SortAlgorithms │ NGO │ AllocationResult │
+├─────────────────────────────────────────────────────────────┤
+│ DATA STORAGE │
+├─────────────────────────────────────────────────────────────┤
+│ Memory (Vector) │ JSON Serialization │
+└─────────────────────────────────────────────────────────────┘
 
-### Administrator
+---
 
-The administrator oversees the entire system and manages:
 
-- NGO records
-- Food inventory
-- Donation history
-- Allocation reports
-- Platform analytics
+### Data Flow
+1. **User Action** → Frontend JavaScript
+2. **API Request** → HTTP call to C++ server
+3. **Processing** → C++ algorithms compute results
+4. **Response** → JSON data returned to frontend
+5. **Display** → Frontend updates UI with results
 
-## Working of the System
+---
 
-The workflow of FoodBridge follows a structured process.
+## 🚀 Installation
 
-First, food suppliers enter information about available food donations. Once the food is added to the system, NGO data is analyzed to determine which organizations require immediate assistance.
+### Prerequisites
+- **C++ Compiler** (GCC 7+ or MSVC 2019+)
+- **Git** (for cloning)
+- **Web Browser** (Chrome, Firefox, Edge)
 
-A priority score is calculated for each NGO based on multiple factors such as beneficiary count, urgency level, and food demand. After ranking NGOs according to their priority scores, the system applies a Greedy Allocation Algorithm to distribute food resources.
+### Step 1: Clone Repository
+git clone https://github.com/r20j/foodbridge.git
+cd foodbridge
 
-The algorithm starts allocating food to the highest-priority NGO and continues until the available stock is exhausted. This approach ensures that limited resources create the maximum possible benefit.
 
-All allocations are recorded and can be viewed through the administrative dashboard.
+### Step 2: Download dependencies
+Download cpp-httplib
+git clone https://github.com/yhirose/cpp-httplib.git
 
-## Algorithmic Approach
+Create frontend directory
+mkdir -p frontend
 
-One of the major highlights of this project is the integration of Data Structures and Algorithms.
+---
+## 📁 Project Structure
+text
+foodbridge/
+├── NGO_backend/
+│   ├── main.cpp
+│   ├── ApiHandler.cpp
+│   ├── ApiHandler.h
+│   ├── algorithm/
+│   │   ├── GreedyAllocation.cpp
+│   │   ├── GreedyAllocation.h
+│   │   ├── PriorityCalculator.cpp
+│   │   ├── PriorityCalculator.h
+│   │   ├── SortAlgorithms.cpp
+│   │   └── SortAlgorithms.h
+│   ├── models/
+│   │   ├── AllocationResult.cpp
+│   │   ├── AllocationResult.h
+│   │   ├── NGO.cpp
+│   │   └── NGO.h
+│   ├── cpp-httplib/
+│   │   └── httplib.h
+│   └── frontend/
+│       ├── index.html
+│       ├── style.css
+│       ├── app.js
+│       └── leaflet/
+│           ├── leaflet.css
+│           ├── leaflet.js
+│           └── images/
+│               ├── layers.png
+│               ├── layers-2x.png
+│               ├── marker-icon.png
+│               ├── marker-icon-2x.png
+│               └── marker-shadow.png
+├── LICENSE
+├── README.md
+└── .gitignore
 
-### Priority Calculation
+---
 
-Each NGO receives a dynamic priority score.
-
-Factors considered include:
-
-- Number of beneficiaries
-- Urgency of food requirement
-- Food shortage level
-- Previous allocations
-
-The higher the score, the greater the priority assigned to the NGO.
-
-### Sorting Mechanism
-
-After calculating priorities, NGOs are sorted in descending order based on their scores.
-
-### Greedy Allocation Algorithm
-
-The Greedy Algorithm allocates available food to the NGO with the highest priority first and continues until all resources are distributed or exhausted.
-
-## Technical Implementation
-
-The backend of FoodBridge is developed using C++, which handles data processing, priority calculations, sorting operations, and food allocation logic.
-
-The frontend is developed using HTML, CSS, and JavaScript to provide a user-friendly interface for interacting with the platform.
-
-Communication between the frontend and backend is achieved through REST APIs. The cpp-httplib library is used to create lightweight HTTP endpoints that enable seamless data exchange.
-
-## Key Features
-
-- NGO registration and management
-- Food donation management
-- Real-time food stock monitoring
-- Priority-based NGO ranking
-- Automated food allocation
-- Donation tracking and history
-- Dashboard analytics and reporting
-- REST API integration
-- Scalable and modular architecture
-
-## Social Impact
-
-The project is designed to create measurable social impact by reducing food wastage and improving access to food for vulnerable communities.
-
-Benefits include:
-
-- Better utilization of surplus food
-- Faster distribution of donations
-- Increased transparency in allocation decisions
-- Improved support for NGOs
-- Greater community participation in food donation programs
-
-## Challenges Addressed
-
-- Fair resource distribution
-- NGO prioritization
-- Handling limited food inventory
-- Reducing allocation bias
-- Maintaining transparency
-- Designing a scalable architecture
-
-## Future Scope
-
-Future enhancements may include:
-
-- MySQL or MongoDB integration
-- AI-based demand forecasting
-- Real-time notifications
-- Geo-location based NGO matching
-- Delivery route optimization
-- Mobile application development
-- Cloud deployment
-- Analytics powered by Machine Learning
-
-## Conclusion
-
-FoodBridge demonstrates how technology, algorithms, and software engineering can be combined to solve a meaningful social problem. The project not only reduces food wastage but also ensures that available resources reach the organizations that need them the most.
-
-## Developed By
-
-**Vani Tyagi**  
-*B.Tech (AI & ML)*
+## 📝 License
+This project is licensed under the MIT License - see the LICENSE file for details.
