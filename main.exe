@@ -1,0 +1,42 @@
+#ifndef NGO_H
+#define NGO_H
+
+#include <string>
+#include <sstream>
+
+class NGO {
+private:
+    int id;
+    std::string name;
+    int urgencyLevel;
+    int peopleCount;
+    int requestedQuantity;
+    int priorityScore;
+
+public:
+    // Constructors - SIRF DECLARATIONS
+    NGO();
+    NGO(int id, std::string name, int urgency, int people, int quantity);
+    
+    // Getters - SIRF DECLARATIONS
+    int getId() const;
+    std::string getName() const;
+    int getUrgencyLevel() const;
+    int getPeopleCount() const;
+    int getRequestedQuantity() const;
+    int getPriorityScore() const;
+    
+    // Setters - SIRF DECLARATIONS
+    void setId(int newId);
+    void setName(const std::string& newName);
+    void setUrgencyLevel(int urgency);
+    void setPeopleCount(int people);
+    void setRequestedQuantity(int quantity);
+    void setPriorityScore(int score);
+    
+    // JSON conversion - SIRF DECLARATIONS
+    std::string toJSON() const;
+    std::string toString() const;
+};
+
+#endif

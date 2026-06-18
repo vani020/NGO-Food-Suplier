@@ -1,0 +1,39 @@
+#pragma once
+#include <string>
+#include <sstream>
+
+class AllocationResult {
+public:
+    enum Status { FULL_ALLOCATION, PARTIAL_ALLOCATION, NO_ALLOCATION };
+    
+    int ngoId;
+    std::string ngoName;
+    int priorityScore;
+    int requestedQuantity;
+    int allocatedQuantity;
+    Status allocationStatus;
+    
+    AllocationResult() : ngoId(0), priorityScore(0), requestedQuantity(0), 
+                         allocatedQuantity(0), allocationStatus(NO_ALLOCATION) {}
+    
+    std::string getStatusString() const {
+        switch(allocationStatus) {
+            case FULL_ALLOCATION: return "FULL";
+            case PARTIAL_ALLOCATION: return "PARTIAL";
+            default: return "NONE";
+        }
+    }
+    
+    std::string toJSON() const {
+        std::ostringstream oss;
+        oss << "{";
+        oss << "\"ngoId\":" << ngoId << ",";
+        oss << "\"ngoName\":\"" << ngoName << "\",";
+        oss << "\"priorityScore\":" << priorityScore << ",";
+        oss << "\"requested\":" << requestedQuantity << ",";
+        oss << "\"allocated\":" << allocatedQuantity << ",";
+        oss << "\"status\":\"" << getStatusString() << "\"";
+        oss << "}";
+        return oss.str();
+    }
+};

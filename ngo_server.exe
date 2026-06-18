@@ -1,0 +1,40 @@
+#include "NGO.h"
+
+NGO::NGO() : id(0), urgencyLevel(0), peopleCount(0), requestedQuantity(0), priorityScore(0) {}
+
+NGO::NGO(int id, std::string name, int urgency, int people, int quantity) 
+    : id(id), name(name), urgencyLevel(urgency), peopleCount(people), 
+      requestedQuantity(quantity), priorityScore(0) {}
+
+int NGO::getId() const { return id; }
+std::string NGO::getName() const { return name; }
+int NGO::getUrgencyLevel() const { return urgencyLevel; }
+int NGO::getPeopleCount() const { return peopleCount; }
+int NGO::getRequestedQuantity() const { return requestedQuantity; }
+int NGO::getPriorityScore() const { return priorityScore; }
+
+void NGO::setId(int newId) { id = newId; }
+void NGO::setName(const std::string& newName) { name = newName; }
+void NGO::setUrgencyLevel(int urgency) { urgencyLevel = urgency; }
+void NGO::setPeopleCount(int people) { peopleCount = people; }
+void NGO::setRequestedQuantity(int quantity) { requestedQuantity = quantity; }
+void NGO::setPriorityScore(int score) { priorityScore = score; }
+
+std::string NGO::toJSON() const {
+    std::ostringstream oss;
+    oss << "{";
+    oss << "\"id\":" << id << ",";
+    oss << "\"name\":\"" << name << "\",";
+    oss << "\"urgency\":" << urgencyLevel << ",";
+    oss << "\"beneficiaries\":" << peopleCount << ",";
+    oss << "\"quantity\":" << requestedQuantity << ",";
+    oss << "\"priorityScore\":" << priorityScore;
+    oss << "}";
+    return oss.str();
+}
+
+std::string NGO::toString() const {
+    std::ostringstream oss;
+    oss << "ID: " << id << " | Name: " << name;
+    return oss.str();
+}

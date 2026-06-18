@@ -1,0 +1,1170 @@
+// ============================================================
+//  FOODBRIDGE — app.js (Popup Text Fixed + NGO Validation)
+//  Full frontend logic connecting to C++ backend API
+// ============================================================
+
+// ── STATE ─────────────────────────────────────────────────
+let ngos = [];
+let donations = [];
+let allocationResults = [];
+let totalFoodStock = 500;
+let allocationCount = 0;
+let currentUser = null;
+let currentRole = 'admin';
+let map = null;
+let mapMarkers = [];
+let selectedNGOId = null;
+let mapInitialized = false;
+
+// ── DEMO USERS ─────────────────────────────────────────────
+const USERS = {
+  'admin@foodbridge.org': { password: 'admin123', role: 'admin',  name: 'Admin User',        avatar: 'A', roleLabel: 'System Administrator' },
+  'hostel@mess.edu':      { password: 'hostel123', role: 'hostel', name: 'Hostel Manager',    avatar: 'H', roleLabel: 'Hostel / Mess Supplier' },
+  'ngo@help.org':         { password: 'ngo123',    role: 'ngo',    name: 'NGO Coordinator',   avatar: 'N', roleLabel: 'NGO Representative' }
+};
+
+// ── VALID NGO NAMES LIST ────────────────────────────────────
+const VALID_NGO_NAMES = [
+  'Clement Town Food Bank',
+  'Dehradun Annapurna',
+  'IMA Community Kitchen',
+  'Niranjanpur Seva Sadan',
+  'Majra Food Distribution',
+  'Ballupur Helping Hands',
+  'Selaqui Annapurna',
+  'Clement Town Rotary',
+  'New Hope Foundation',
+  'Clement Town Relief',
+  'Roti Bank',
+  'Khalsa Aid',
+  'Akshaya Patra',
+  'Food For Life',
+  'Seva Sadan',
+  'Goonj',
+  'Helping Hands',
+  'Annapurna Foundation',
+  'Little Help',
+  'Hope Initiative'
+];
+
+// ── DEHRADUN CLEMENT TOWN LOCATIONS ──────────────────────
+const DEHRADUN_CENTER = { lat: 30.3165, lng: 78.0322 };
+
+const NGO_LOCATIONS = [
+  { lat: 30.3165, lng: 78.0322, name: 'Clement Town Center', locality: 'Clement Town' },
+  { lat: 30.3140, lng: 78.0300, name: 'Clement Town East', locality: 'Clement Town' },
+  { lat: 30.3180, lng: 78.0340, name: 'Clement Town North', locality: 'Clement Town' },
+  { lat: 30.3120, lng: 78.0280, name: 'Clement Town South', locality: 'Clement Town' },
+  { lat: 30.3200, lng: 78.0360, name: 'Clement Town West', locality: 'Clement Town' },
+  { lat: 30.3100, lng: 78.0400, name: 'Near IMA Dehradun', locality: 'IMA Dehradun' },
+  { lat: 30.3250, lng: 78.0250, name: 'Niranjanpur', locality: 'Niranjanpur' },
+  { lat: 30.3080, lng: 78.0450, name: 'Majra', locality: 'Majra' },
+  { lat: 30.3300, lng: 78.0200, name: 'Ballupur', locality: 'Ballupur' },
+  { lat: 30.3050, lng: 78.0500, name: 'Selaqui', locality: 'Selaqui' }
+];
+
+// ── INIT ───────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  updateClock();
+  setInterval(updateClock, 1000);
+  setInterval(loadFoodStock, 10000);
+  checkBackendOnLoad();
+  
+  setTimeout(() => {
+    initializeMap();
+  }, 500);
+});
+
+function updateClock() {
+  const el = document.getElementById('time-display');
+  if (el) el.textContent = new Date().toLocaleTimeString();
+}
+
+// ── VALIDATION FUNCTION ─────────────────────────────────────
+function isValidNGO(name) {
+  if (!name || name.trim() === '') return false;
+  const trimmedName = name.trim();
+  return VALID_NGO_NAMES.some(validName => 
+    validName.toLowerCase() === trimmedName.toLowerCase()
+  );
+}
+
+function getSimilarNGOs(name) {
+  const trimmedName = name.trim().toLowerCase();
+  return VALID_NGO_NAMES.filter(validName => 
+    validName.toLowerCase().includes(trimmedName) || 
+    trimmedName.includes(validName.toLowerCase())
+  );
+}
+
+// ── LEAFLET MAP INITIALIZATION ────────────────────────────
+function initializeMap() {
+  const mapContainer = document.getElementById('ngo-map');
+  if (!mapContainer) {
+    console.error('Map container not found');
+    return;
+  }
+
+  if (mapInitialized) {
+    map.invalidateSize();
+    return;
+  }
+
+  try {
+    map = L.map('ngo-map', {
+      center: [DEHRADUN_CENTER.lat, DEHRADUN_CENTER.lng],
+      zoom: 15,
+      zoomControl: true,
+      fadeAnimation: true,
+      attributionControl: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+      minZoom: 10
+    }).addTo(map);
+
+    L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
+
+    L.marker([DEHRADUN_CENTER.lat, DEHRADUN_CENTER.lng], {
+      icon: L.divIcon({
+        className: 'area-marker',
+        html: '📍',
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+      })
+    }).addTo(map).bindPopup('<b>📍 Dehradun - Clement Town</b><br>NGO Food Supply Network');
+
+    L.circle([DEHRADUN_CENTER.lat, DEHRADUN_CENTER.lng], {
+      radius: 3000,
+      color: '#4f8ef7',
+      fillColor: '#4f8ef7',
+      fillOpacity: 0.1,
+      weight: 1
+    }).addTo(map).bindPopup('📦 NGO Coverage Area');
+
+    mapInitialized = true;
+    console.log('Map initialized successfully');
+
+    loadNGOs();
+
+    setTimeout(() => {
+      if (map) {
+        map.invalidateSize();
+      }
+    }, 100);
+
+  } catch (error) {
+    console.error('Error initializing map:', error);
+  }
+}
+
+// ── MAP RESIZE FIX ──────────────────────────────────────────
+function fixMapSize() {
+  if (map) {
+    setTimeout(() => {
+      map.invalidateSize();
+      console.log('Map size fixed');
+    }, 200);
+  }
+}
+
+// ── BACKEND CONNECTION CHECK ────────────────────────────────
+async function checkBackendOnLoad() {
+  try {
+    const res = await fetch('/api/food-stock');
+    if (!res.ok) throw new Error();
+    showBannerToast('🟢 Backend connected successfully!', 'success');
+  } catch {
+    showBannerToast('🔴 Backend not reachable. Make sure the server is running.', 'error');
+  }
+}
+
+async function checkBackendAfterLogin() {
+  try {
+    const res = await fetch('/api/food-stock');
+    if (!res.ok) throw new Error();
+    showToast('🟢 Backend connected successfully!', 'success');
+  } catch {
+    showToast('🔴 Backend not reachable. Some features may not work.', 'error');
+  }
+}
+
+function showBannerToast(msg, type = 'info') {
+  const existing = document.getElementById('banner-toast');
+  if (existing) existing.remove();
+
+  const colors = {
+    success: { bg: '#1a3a2a', border: '#2ecc71', color: '#2ecc71' },
+    error:   { bg: '#3a1a1a', border: '#e74c3c', color: '#e74c3c' },
+    info:    { bg: '#1a2a3a', border: '#4f8ef7', color: '#4f8ef7' }
+  };
+  const c = colors[type] || colors.info;
+
+  const banner = document.createElement('div');
+  banner.id = 'banner-toast';
+  banner.textContent = msg;
+  banner.style.cssText = `
+    position: fixed;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: ${c.bg};
+    color: ${c.color};
+    border: 1.5px solid ${c.border};
+    border-radius: 10px;
+    padding: 12px 28px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 99999;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    letter-spacing: 0.3px;
+    transition: opacity 0.4s, transform 0.4s;
+  `;
+  document.body.appendChild(banner);
+
+  setTimeout(() => {
+    banner.style.opacity = '0';
+    banner.style.transform = 'translateX(-50%) translateY(-10px)';
+    setTimeout(() => banner.remove(), 400);
+  }, 4000);
+}
+
+// ── AUTH ───────────────────────────────────────────────────
+function selectRole(role, btn) {
+  currentRole = role;
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const demos = { admin: ['admin@foodbridge.org','admin123'], hostel: ['hostel@mess.edu','hostel123'], ngo: ['ngo@help.org','ngo123'] };
+  fillDemo(...demos[role]);
+}
+
+function fillDemo(email, pass) {
+  document.getElementById('login-email').value = email;
+  document.getElementById('login-password').value = pass;
+}
+
+function togglePassword() {
+  const inp = document.getElementById('login-password');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function handleLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+
+  if (!email || !pass) { showToast('Please enter email and password', 'error'); return; }
+
+  const user = USERS[email];
+  if (!user || user.password !== pass) {
+    showToast('Invalid credentials. Try demo accounts below.', 'error'); return;
+  }
+
+  currentUser = { email, ...user };
+  document.getElementById('user-name').textContent   = user.name;
+  document.getElementById('user-role').textContent   = user.roleLabel;
+  document.getElementById('user-avatar').textContent = user.avatar;
+
+  document.getElementById('login-page').classList.remove('active');
+  document.getElementById('main-page').classList.add('active');
+
+  loadNGOs();
+  loadFoodStock();
+  loadDonations();
+  checkBackendAfterLogin();
+  showToast(`Welcome back, ${user.name}! 👋`, 'success');
+  
+  setTimeout(() => {
+    fixMapSize();
+  }, 500);
+}
+
+function handleLogout() {
+  currentUser = null;
+  document.getElementById('main-page').classList.remove('active');
+  document.getElementById('login-page').classList.add('active');
+  showToast('Signed out successfully', 'info');
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────
+const PAGE_TITLES = {
+  dashboard:  'Dashboard',
+  ngo:        'NGO Management',
+  food:       'Food Donations',
+  allocation: 'Allocation Engine',
+  reports:    'Reports',
+  complexity: 'Complexity Analysis'
+};
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById(`${tab}-tab`);
+  if (pane) pane.classList.add('active');
+
+  document.getElementById('page-title').textContent = PAGE_TITLES[tab] || tab;
+  document.getElementById('breadcrumb').textContent = `Home / ${PAGE_TITLES[tab] || tab}`;
+
+  if (tab === 'dashboard') refreshDashboard();
+  
+  if (tab === 'ngo') {
+    setTimeout(() => {
+      fixMapSize();
+      if (map && ngos.length > 0) {
+        updateMapMarkers(ngos);
+      }
+    }, 300);
+  }
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
+// ==================== SORTING HELPER ====================
+function sortNGOsByPriority(data) {
+  return [...data].sort((a, b) => {
+    const scoreA = a.priorityScore || 0;
+    const scoreB = b.priorityScore || 0;
+    return scoreB - scoreA;
+  });
+}
+
+// ==================== MAP MARKER FUNCTIONS ====================
+
+function getPriorityColor(score, isNew = false) {
+  if (isNew) return '#9b59b6';
+  if (!score || score === 0) return '#95a5a6';
+  if (score >= 800) return '#e74c3c';
+  if (score >= 500) return '#f39c12';
+  if (score >= 300) return '#2ecc71';
+  return '#3498db';
+}
+
+function getPriorityLabel(score) {
+  if (!score || score === 0) return 'Not Calculated';
+  if (score >= 800) return '🔴 High Priority';
+  if (score >= 500) return '🟡 Medium Priority';
+  if (score >= 300) return '🟢 Low-Medium Priority';
+  return '🔵 Low Priority';
+}
+
+function createCustomIcon(score, isNew = false, ngoName = '') {
+  const color = getPriorityColor(score, isNew);
+  const size = isNew ? 38 : 30;
+  const borderColor = isNew ? '#9b59b6' : '#ffffff';
+  
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" width="${size}" height="${size}">
+      <ellipse cx="25" cy="44" rx="12" ry="4" fill="rgba(0,0,0,0.3)"/>
+      <path d="M25 2 C15 2 8 10 8 18 C8 28 25 45 25 45 C25 45 42 28 42 18 C42 10 35 2 25 2 Z" 
+            fill="${color}" stroke="${borderColor}" stroke-width="2"/>
+      <circle cx="25" cy="18" r="7" fill="${borderColor}" opacity="0.9"/>
+      <circle cx="25" cy="18" r="5" fill="${color}" opacity="0.6"/>
+      ${isNew ? '<circle cx="25" cy="18" r="3" fill="#9b59b6" opacity="0.9"/>' : ''}
+      ${isNew ? '<text x="25" y="22" text-anchor="middle" font-size="8" fill="white" font-weight="bold">NEW</text>' : ''}
+    </svg>
+  `;
+
+  return L.divIcon({
+    className: 'ngo-marker',
+    html: svg,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size],
+    popupAnchor: [0, -size/2 - 5]
+  });
+}
+
+function updateMapMarkers(ngosData) {
+  if (!map) {
+    console.warn('Map not initialized');
+    return;
+  }
+
+  mapMarkers.forEach(marker => {
+    try {
+      map.removeLayer(marker);
+    } catch(e) {}
+  });
+  mapMarkers = [];
+
+  if (!ngosData || ngosData.length === 0) {
+    const noDataMsg = L.divIcon({
+      className: 'no-data-marker',
+      html: '<div style="background:rgba(0,0,0,0.7);color:white;padding:10px 20px;border-radius:8px;font-size:14px;">No NGOs registered in this area</div>',
+      iconSize: [200, 40],
+      iconAnchor: [100, 20]
+    });
+    const msgMarker = L.marker([DEHRADUN_CENTER.lat, DEHRADUN_CENTER.lng + 0.005], { icon: noDataMsg }).addTo(map);
+    mapMarkers.push(msgMarker);
+    return;
+  }
+
+  const sorted = sortNGOsByPriority(ngosData);
+
+  sorted.forEach((ngo, index) => {
+    const locIndex = index % NGO_LOCATIONS.length;
+    const location = NGO_LOCATIONS[locIndex];
+    
+    const isNew = ngo.isNew || false;
+    
+    const icon = createCustomIcon(ngo.priorityScore, isNew, ngo.name);
+    const marker = L.marker([location.lat, location.lng], { icon });
+    
+    const priorityLabel = getPriorityLabel(ngo.priorityScore);
+    const color = getPriorityColor(ngo.priorityScore, isNew);
+    const statusColor = isNew ? '#9b59b6' : color;
+    
+    // ── FIXED POPUP CONTENT - WHITE TEXT ON DARK BACKGROUND ──
+    const popupContent = `
+      <div style="min-width:220px;max-width:300px;font-family:'DM Sans',sans-serif;color:#e8eaf0;background:transparent;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;border-bottom:2px solid ${statusColor};padding-bottom:10px;">
+          <span style="font-size:24px;">🏢</span>
+          <div>
+            <h3 style="margin:0;font-size:17px;font-weight:700;color:#ffffff;">${ngo.name}</h3>
+            <span style="font-size:12px;color:#8bb4f8;">📍 ${location.name}</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;margin:8px 0;">
+          <span style="color:#8bb4f8;">🆔 ID:</span>
+          <span style="font-family:monospace;color:#e8eaf0;font-weight:500;">#${ngo.id}</span>
+          <span style="color:#8bb4f8;">📊 Priority:</span>
+          <span style="font-weight:700;color:${color};">${ngo.priorityScore || 'Not Calculated'}</span>
+          <span style="color:#8bb4f8;">🚨 Urgency:</span>
+          <span style="font-weight:600;color:#e8eaf0;">${ngo.urgency || 0}/10</span>
+          <span style="color:#8bb4f8;">👥 Beneficiaries:</span>
+          <span style="font-weight:600;color:#e8eaf0;">${ngo.beneficiaries || 0}</span>
+          <span style="color:#8bb4f8;">🍱 Food Required:</span>
+          <span style="font-weight:600;color:#e8eaf0;">${ngo.quantity || 0} kg</span>
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #252b42;display:flex;gap:6px;flex-wrap:wrap;">
+          <span style="background:${isNew ? '#9b59b6' : color};color:white;padding:3px 12px;border-radius:14px;font-size:11px;font-weight:600;">
+            ${isNew ? '🆕 NEW NGO' : priorityLabel}
+          </span>
+          ${ngo.priorityScore >= 800 ? '<span style="background:#e74c3c;color:white;padding:3px 12px;border-radius:14px;font-size:11px;font-weight:600;">⚠️ URGENT</span>' : ''}
+        </div>
+        <button onclick="zoomToNGO(${ngo.id})" style="width:100%;margin-top:10px;padding:8px;background:#4f8ef7;color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:background 0.2s;">
+          📍 Focus on Map
+        </button>
+      </div>
+    `;
+    
+    marker.bindPopup(popupContent, {
+      maxWidth: 320,
+      className: 'ngo-popup-fixed',
+      closeButton: true
+    });
+
+    marker.on('click', function() {
+      showNGODetails(ngo, location);
+      selectedNGOId = ngo.id;
+    });
+
+    marker.addTo(map);
+    mapMarkers.push(marker);
+  });
+
+  if (mapMarkers.length > 0) {
+    try {
+      const group = L.featureGroup(mapMarkers);
+      map.fitBounds(group.getBounds().pad(0.2));
+    } catch(e) {
+      map.setView([DEHRADUN_CENTER.lat, DEHRADUN_CENTER.lng], 14);
+    }
+  }
+}
+
+// ── SHOW NGO DETAILS ──────────────────────────────────────
+function showNGODetails(ngo, location) {
+  const panel = document.getElementById('ngo-detail-panel');
+  if (!panel) return;
+
+  const isNew = ngo.isNew || false;
+  const color = getPriorityColor(ngo.priorityScore, isNew);
+  const priorityLabel = getPriorityLabel(ngo.priorityScore);
+  
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h3 style="margin:0;font-size:18px;color:#e8eaf0;">🏢 ${ngo.name}</h3>
+        <span style="font-size:12px;color:#7b82a0;">ID: #${ngo.id} • ${location.name}</span>
+      </div>
+      <span style="background:${isNew ? '#9b59b6' : color};color:white;padding:2px 12px;border-radius:12px;font-size:11px;font-weight:600;">
+        ${isNew ? '🆕 NEW' : priorityLabel}
+      </span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:8px;margin-top:12px;">
+      <div style="background:#131726;padding:8px 12px;border-radius:6px;border:1px solid #252b42;">
+        <div style="font-size:11px;color:#7b82a0;">Priority Score</div>
+        <div style="font-size:18px;font-weight:700;color:${color};">${ngo.priorityScore || '—'}</div>
+      </div>
+      <div style="background:#131726;padding:8px 12px;border-radius:6px;border:1px solid #252b42;">
+        <div style="font-size:11px;color:#7b82a0;">Urgency Level</div>
+        <div style="font-size:18px;font-weight:700;color:#e8eaf0;">${ngo.urgency || 0}/10</div>
+      </div>
+      <div style="background:#131726;padding:8px 12px;border-radius:6px;border:1px solid #252b42;">
+        <div style="font-size:11px;color:#7b82a0;">Beneficiaries</div>
+        <div style="font-size:18px;font-weight:700;color:#e8eaf0;">${ngo.beneficiaries || 0}</div>
+      </div>
+      <div style="background:#131726;padding:8px 12px;border-radius:6px;border:1px solid #252b42;">
+        <div style="font-size:11px;color:#7b82a0;">Food Required</div>
+        <div style="font-size:18px;font-weight:700;color:#e8eaf0;">${ngo.quantity || 0} kg</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="zoomToNGO(${ngo.id})" style="padding:6px 14px;background:#4f8ef7;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;">
+        🔍 Zoom to Location
+      </button>
+      ${isNew ? '<span style="padding:6px 14px;background:#9b59b6;color:white;border-radius:6px;font-size:12px;font-weight:600;">🆕 Newly Added</span>' : ''}
+    </div>
+  `;
+  panel.style.display = 'block';
+}
+
+function zoomToNGO(ngoId) {
+  const ngo = ngos.find(n => n.id === ngoId);
+  if (!ngo) return;
+  
+  const index = ngos.indexOf(ngo);
+  const location = NGO_LOCATIONS[index % NGO_LOCATIONS.length];
+  
+  if (map) {
+    map.flyTo([location.lat, location.lng], 17, {
+      duration: 1.5
+    });
+    
+    setTimeout(() => {
+      mapMarkers.forEach(marker => {
+        const popup = marker.getPopup();
+        if (popup && popup.getContent().includes(ngo.name)) {
+          marker.openPopup();
+        }
+      });
+    }, 1500);
+  }
+}
+
+function refreshMap() {
+  if (!map) {
+    initializeMap();
+    return;
+  }
+  fixMapSize();
+  updateMapMarkers(ngos);
+  showToast('🔄 Map refreshed', 'info');
+}
+
+// ── API: LOAD NGOs ──────────────────────────────────────────
+async function loadNGOs() {
+  try {
+    const res = await fetch('/api/ngos');
+    if (!res.ok) throw new Error();
+    ngos = await res.json();
+    
+    // Filter - only valid NGOs
+    ngos = ngos.filter(ngo => isValidNGO(ngo.name));
+    
+    if (ngos.length > 8) {
+      ngos.forEach((ngo, index) => {
+        if (index >= 8) ngo.isNew = true;
+      });
+    }
+    
+    ngos = sortNGOsByPriority(ngos);
+    displayNGOs(ngos);
+    
+    if (map) {
+      updateMapMarkers(ngos);
+    }
+    refreshDashboard();
+  } catch {
+    displayNGOs([]);
+    loadSampleNGOs();
+  }
+}
+
+// ── SAMPLE NGO DATA ──────────────────────────────────────────
+function loadSampleNGOs() {
+  const sampleNgos = [
+    { id: 1, name: 'Clement Town Food Bank', urgency: 9, beneficiaries: 750, quantity: 375, priorityScore: 850, isNew: false },
+    { id: 2, name: 'Dehradun Annapurna', urgency: 8, beneficiaries: 620, quantity: 310, priorityScore: 720, isNew: false },
+    { id: 3, name: 'IMA Community Kitchen', urgency: 9, beneficiaries: 680, quantity: 340, priorityScore: 780, isNew: false },
+    { id: 4, name: 'Niranjanpur Seva Sadan', urgency: 7, beneficiaries: 420, quantity: 210, priorityScore: 580, isNew: false },
+    { id: 5, name: 'Majra Food Distribution', urgency: 8, beneficiaries: 480, quantity: 240, priorityScore: 640, isNew: false },
+    { id: 6, name: 'Ballupur Helping Hands', urgency: 7, beneficiaries: 350, quantity: 175, priorityScore: 530, isNew: false },
+    { id: 7, name: 'Selaqui Annapurna', urgency: 6, beneficiaries: 280, quantity: 140, priorityScore: 440, isNew: false },
+    { id: 8, name: 'Clement Town Rotary', urgency: 8, beneficiaries: 550, quantity: 275, priorityScore: 700, isNew: false },
+    { id: 9, name: 'New Hope Foundation', urgency: 7, beneficiaries: 300, quantity: 150, priorityScore: 560, isNew: true },
+    { id: 10, name: 'Clement Town Relief', urgency: 6, beneficiaries: 200, quantity: 100, priorityScore: 420, isNew: true }
+  ];
+  
+  ngos = sampleNgos;
+  displayNGOs(ngos);
+  if (map) updateMapMarkers(ngos);
+  refreshDashboard();
+}
+
+// ── API: FOOD STOCK ─────────────────────────────────────────
+async function loadFoodStock() {
+  try {
+    const res = await fetch('/api/food-stock');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    totalFoodStock = data.foodStock;
+    updateStockDisplays(totalFoodStock);
+  } catch { /* silent */ }
+}
+
+function updateStockDisplays(val) {
+  ['food-stock-display','topbar-stock','dash-food-stock'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  });
+}
+
+// ── API: LOAD DONATIONS ─────────────────────────────────────
+async function loadDonations() {
+  try {
+    const res = await fetch('/api/donations?limit=50');
+    if (!res.ok) throw new Error();
+    donations = await res.json();
+    displayDonations();
+  } catch { /* silent */ }
+}
+
+// ── API: ADD NGO ────────────────────────────────────────────
+async function addNGO() {
+  const name = document.getElementById('ngo-name').value.trim();
+  const urgency = parseInt(document.getElementById('ngo-urgency').value);
+  const beneficiaries = parseInt(document.getElementById('ngo-beneficiaries').value);
+  const quantity = parseInt(document.getElementById('ngo-quantity').value);
+
+  // ── VALIDATION CHECKS ──────────────────────────────────
+  if (!name) { 
+    showToast('❌ NGO name is required', 'error'); 
+    return; 
+  }
+  
+  if (urgency < 1 || urgency > 10) { 
+    showToast('❌ Urgency must be 1–10', 'error'); 
+    return; 
+  }
+  
+  if (beneficiaries < 10 || beneficiaries > 10000) {
+    showToast('❌ Beneficiaries must be between 10 and 10,000', 'error');
+    return;
+  }
+  
+  if (quantity < 5 || quantity > 5000) {
+    showToast('❌ Food quantity must be between 5 and 5,000 kg', 'error');
+    return;
+  }
+
+  // ── CHECK IF NGO IS VALID ─────────────────────────────
+  if (!isValidNGO(name)) {
+    const similar = getSimilarNGOs(name);
+    let suggestionMsg = '';
+    if (similar.length > 0) {
+      suggestionMsg = `<br><br>📌 Did you mean:<br>${similar.map(s => '• ' + s).join('<br>')}`;
+    }
+    showToast(`❌ "${name}" is not a registered NGO.${suggestionMsg}`, 'error');
+    return;
+  }
+
+  // ── CHECK FOR DUPLICATE ──────────────────────────────
+  const duplicate = ngos.some(ngo => ngo.name.toLowerCase() === name.toLowerCase());
+  if (duplicate) {
+    showToast(`❌ "${name}" is already registered!`, 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/ngos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, urgency, beneficiaries, quantity })
+    });
+    if (!res.ok) throw new Error();
+    
+    const newNGO = { 
+      id: Date.now(), 
+      name, 
+      urgency, 
+      beneficiaries, 
+      quantity, 
+      isNew: true,
+      priorityScore: (urgency * 60) + (beneficiaries * 40)
+    };
+    ngos.push(newNGO);
+    ngos = sortNGOsByPriority(ngos);
+    displayNGOs(ngos);
+    
+    if (map) {
+      updateMapMarkers(ngos);
+      setTimeout(() => {
+        const index = ngos.indexOf(newNGO);
+        const location = NGO_LOCATIONS[index % NGO_LOCATIONS.length];
+        if (map) {
+          map.flyTo([location.lat, location.lng], 16, { duration: 1.5 });
+        }
+      }, 500);
+    }
+    
+    refreshDashboard();
+    hideAddNGOForm();
+    showToast(`✅ ${name} registered successfully! (Purple marker on map)`, 'success');
+    
+  } catch {
+    showToast('Failed to add NGO. Check backend connection.', 'error');
+  }
+}
+
+// ── API: CALCULATE PRIORITIES ───────────────────────────────
+async function calculatePriorities() {
+  try {
+    const res = await fetch('/api/calculate-priority', { method: 'POST' });
+    if (!res.ok) throw new Error();
+    ngos = await res.json();
+    
+    // Filter valid NGOs only
+    ngos = ngos.filter(ngo => isValidNGO(ngo.name));
+    
+    ngos = sortNGOsByPriority(ngos);
+    displayNGOs(ngos);
+    if (map) updateMapMarkers(ngos);
+    refreshDashboard();
+    showToast('✅ Priority scores calculated using C++ algorithm!', 'success');
+  } catch {
+    showToast('Failed to calculate priorities', 'error');
+  }
+}
+
+// ── API: ADD FOOD DONATION ──────────────────────────────────
+async function addFoodDonation() {
+  const supplier = document.getElementById('supplier-name').value.trim();
+  const foodType = document.getElementById('food-type').value.trim() || 'Mixed Food';
+  const quantity = parseInt(document.getElementById('food-quantity').value);
+
+  if (!supplier) { showToast('Supplier name is required', 'error'); return; }
+  if (!quantity || quantity < 1) { showToast('Enter a valid quantity', 'error'); return; }
+
+  try {
+    const res = await fetch('/api/add-food', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quantity, supplier, foodType })
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    totalFoodStock = data.foodStock;
+    updateStockDisplays(totalFoodStock);
+  } catch {
+    totalFoodStock += quantity;
+    updateStockDisplays(totalFoodStock);
+  }
+
+  hideAddFoodForm();
+  await loadDonations();
+  document.getElementById('allocation-food-stock').value = totalFoodStock;
+  showToast(`✅ Added ${quantity} kg from ${supplier}`, 'success');
+}
+
+// ── API: RUN ALLOCATION ─────────────────────────────────────
+async function runAllocation() {
+  const algorithm = parseInt(document.getElementById('sort-algorithm').value);
+  let foodStock   = parseInt(document.getElementById('allocation-food-stock').value);
+  if (isNaN(foodStock) || foodStock <= 0) { showToast('Enter a valid food stock value', 'error'); return; }
+
+  const btn = document.querySelector('.run-btn');
+  if (btn) { btn.textContent = '⏳ Running...'; btn.disabled = true; }
+
+  try {
+    const res = await fetch('/api/allocate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ algorithm, food_stock: foodStock })
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+
+    allocationResults = data.results || [];
+    allocationCount++;
+
+    displayAllocationResults(allocationResults);
+    totalFoodStock = data.remainingFood ?? (foodStock - (data.totalAllocated || 0));
+    updateStockDisplays(totalFoodStock);
+
+    const bar = document.getElementById('allocation-summary-bar');
+    if (bar) bar.style.display = 'flex';
+    setText('sum-algorithm',  data.algorithm        || getAlgorithmName(algorithm));
+    setText('sum-time',       data.timeComplexity   || getTimeComplexity(algorithm));
+    setText('sum-allocated',  (data.totalAllocated  || 0) + ' kg');
+    setText('sum-remaining',  (data.remainingFood   || 0) + ' kg');
+    setText('sum-efficiency', ((data.efficiency     || 0)).toFixed(1) + '%');
+
+    updateLiveComplexity(data, algorithm);
+    refreshDashboard();
+    showToast(`⚡ Allocation complete! ${data.totalAllocated || 0} kg distributed`, 'success');
+  } catch {
+    showToast('Allocation failed. Check backend.', 'error');
+  } finally {
+    if (btn) { btn.textContent = '⚡ Run Greedy Allocation'; btn.disabled = false; }
+  }
+}
+
+// ── API: DELETE NGO ─────────────────────────────────────────
+async function deleteNGO(id) {
+  if (!confirm('Delete this NGO?')) return;
+  try {
+    const res = await fetch(`/api/ngos/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error();
+    ngos = ngos.filter(n => n.id !== id);
+    displayNGOs(ngos);
+    if (map) updateMapMarkers(ngos);
+    refreshDashboard();
+    showToast('NGO deleted', 'warning');
+  } catch {
+    showToast('Failed to delete NGO', 'error');
+  }
+}
+
+// ── FRONTEND ALGORITHMS ──────────────────────────────────────
+let sortCol = 'priorityScore', sortDir = 'desc';
+
+function sortByColumn(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    sortCol = col;
+    sortDir = 'desc';
+  }
+  
+  const sorted = [...ngos].sort((a, b) => {
+    let av = a[col], bv = b[col];
+    if (col === 'priorityScore') {
+      av = av || 0;
+      bv = bv || 0;
+    }
+    if (typeof av === 'string') {
+      av = av.toLowerCase();
+      bv = bv.toLowerCase();
+    }
+    if (sortDir === 'desc') {
+      return av > bv ? -1 : av < bv ? 1 : 0;
+    } else {
+      return av < bv ? -1 : av > bv ? 1 : 0;
+    }
+  });
+  displayNGOs(sorted);
+}
+
+function filterNGOs(term) {
+  if (!term.trim()) { 
+    displayNGOs(ngos); 
+    return; 
+  }
+  const t = term.toLowerCase();
+  const filtered = ngos.filter(n =>
+    n.name.toLowerCase().includes(t) || String(n.id).includes(t)
+  );
+  displayNGOs(filtered);
+}
+
+function calcStats() {
+  if (!ngos.length) return null;
+  let totB = 0, totQ = 0, maxU = 0;
+  for (const n of ngos) { 
+    totB += n.beneficiaries; 
+    totQ += n.quantity; 
+    if (n.urgency > maxU) maxU = n.urgency; 
+  }
+  return { 
+    count: ngos.length, 
+    totalBeneficiaries: totB, 
+    totalRequested: totQ, 
+    avgB: (totB/ngos.length).toFixed(0), 
+    avgQ: (totQ/ngos.length).toFixed(0), 
+    maxUrgency: maxU 
+  };
+}
+
+function getPriorityColorOld(score) {
+  if (!score) return { bg: 'rgba(255,255,255,0.05)', color: '#7b82a0' };
+  if (score >= 800) return { bg: 'rgba(231,76,60,0.15)',  color: '#e74c3c' };
+  if (score >= 500) return { bg: 'rgba(245,166,35,0.15)', color: '#f5a623' };
+  if (score >= 300) return { bg: 'rgba(79,142,247,0.15)', color: '#4f8ef7' };
+  return { bg: 'rgba(46,204,113,0.15)', color: '#2ecc71' };
+}
+
+// ── DISPLAY: NGOs ───────────────────────────────────────────
+function displayNGOs(data) {
+  const tbody = document.getElementById('ngo-tbody');
+  if (!tbody) return;
+  
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No NGOs registered yet. Click "Add NGO" to get started.</td></tr>';
+    return;
+  }
+  
+  const sortedData = sortNGOsByPriority(data);
+  
+  tbody.innerHTML = sortedData.map(n => {
+    const c = getPriorityColorOld(n.priorityScore);
+    const isNew = n.isNew || false;
+    const newBadge = isNew ? '<span style="background:#9b59b6;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-left:4px;">NEW</span>' : '';
+    const pill = n.priorityScore
+      ? `<span class="priority-pill" style="background:${c.bg};color:${c.color}">${n.priorityScore}</span>`
+      : '<span style="color:var(--muted)">—</span>';
+    const urgencyBar = `<span style="font-weight:600">${n.urgency}</span><span style="color:var(--muted);font-size:11px">/10</span>`;
+    return `
+      <tr>
+        <td style="font-family:var(--font-mono);color:var(--muted)">#${n.id}</td>
+        <td style="font-weight:500">${n.name} ${newBadge}</td>
+        <td>${urgencyBar}</td>
+        <td>${n.beneficiaries.toLocaleString()}</td>
+        <td>${n.quantity} kg</td>
+        <td>${pill}</td>
+        <td><button class="del-btn" onclick="deleteNGO(${n.id})">🗑 Delete</button></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ── DISPLAY: DONATIONS ──────────────────────────────────────
+function displayDonations() {
+  const tbody = document.getElementById('donation-tbody');
+  if (!tbody) return;
+  const el = document.getElementById('donation-count');
+  if (el) el.textContent = `${donations.length} entr${donations.length === 1 ? 'y' : 'ies'}`;
+
+  if (!donations.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No donations recorded yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = donations.slice(0, 20).map(d => `
+    <tr>
+      <td style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">${d.date}</td>
+      <td style="font-weight:500">${d.supplier}</td>
+      <td style="color:var(--muted)">${d.foodType}</td>
+      <td style="font-family:var(--font-mono);color:var(--accent)">${d.quantity} kg</td>
+      <td><span class="status-pill status-full">${d.status || 'Received'}</span></td>
+    </tr>
+  `).join('');
+}
+
+// ── DISPLAY: ALLOCATION RESULTS ─────────────────────────────
+function displayAllocationResults(results) {
+  const tbody = document.getElementById('allocation-tbody');
+  if (!tbody) return;
+  if (!results || !results.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-row">Run allocation to see results</td></tr>';
+    return;
+  }
+  tbody.innerHTML = results.map((r, i) => {
+    const statusClass = r.status === 'FULL' ? 'status-full' : r.status === 'PARTIAL' ? 'status-partial' : 'status-none';
+    const pct = r.requested > 0 ? Math.round((r.allocated / r.requested) * 100) : 0;
+    return `
+      <tr>
+        <td style="font-family:var(--font-mono);color:var(--muted)">#${i+1}</td>
+        <td style="font-weight:500">${r.ngoName}</td>
+        <td>${r.priorityScore ? `<span class="priority-pill" style="background:rgba(245,166,35,.15);color:var(--accent)">${r.priorityScore}</span>` : '—'}</td>
+        <td>${r.requested} kg</td>
+        <td style="font-weight:600">${r.allocated} kg <span style="font-size:11px;color:var(--muted)">(${pct}%)</span></td>
+        <td><span class="status-pill ${statusClass}">${r.status}</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ── DASHBOARD REFRESH ───────────────────────────────────────
+function refreshDashboard() {
+  const stats = calcStats();
+  setText('dash-ngo-count',    stats ? stats.count : 0);
+  setText('dash-food-stock',   totalFoodStock);
+  setText('dash-beneficiaries', stats ? stats.totalBeneficiaries.toLocaleString() : 0);
+  setText('dash-allocations',  allocationCount);
+
+  const list = document.getElementById('dash-priority-list');
+  if (!list) return;
+  
+  const top = [...ngos]
+    .filter(n => n.priorityScore)
+    .sort((a,b) => b.priorityScore - a.priorityScore)
+    .slice(0, 5);
+    
+  if (!top.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Calculate priority scores first</div>';
+    return;
+  }
+  list.innerHTML = top.map(n => {
+    const cls = n.priorityScore >= 800 ? 'pi-high' : n.priorityScore >= 500 ? 'pi-mid' : 'pi-low';
+    const newBadge = n.isNew ? ' 🆕' : '';
+    return `<div class="priority-item"><span class="pi-name">${n.name}${newBadge}</span><span class="pi-score ${cls}">${n.priorityScore}</span></div>`;
+  }).join('');
+}
+
+// ── REPORT ──────────────────────────────────────────────────
+function generateReport() {
+  const stats = calcStats();
+  const now   = new Date().toLocaleString();
+  
+  const sortedNGOs = sortNGOsByPriority(ngos);
+
+  let txt = `╔══════════════════════════════════════════════════════════════╗
+║         FOODBRIDGE — NGO FOOD SUPPLIER SYSTEM REPORT         ║
+╚══════════════════════════════════════════════════════════════╝
+
+📅  Generated : ${now}
+📍  Location  : Dehradun - Clement Town
+👤  User      : ${currentUser?.name || 'Unknown'} (${currentUser?.roleLabel || ''})
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ PROJECT OVERVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Name      : NGO Food Supplier System
+  Location  : Dehradun, Clement Town Area
+  Algorithm : Greedy Allocation + Priority-Based Sorting
+  Backend   : C++ (cpp-httplib)
+  Frontend  : Vanilla JS + Leaflet Maps
+  Formula   : Priority = (Urgency × 60) + (Beneficiaries × 40)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ STATISTICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Total NGOs            : ${stats?.count || 0}
+  Total Beneficiaries   : ${stats?.totalBeneficiaries?.toLocaleString() || 0}
+  Total Food Requested  : ${stats?.totalRequested || 0} kg
+  Current Food Stock    : ${totalFoodStock} kg
+  Allocations Run       : ${allocationCount}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ REGISTERED NGOs (Sorted by Priority - Highest First)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+  for (const n of sortedNGOs) {
+    const isNew = n.isNew ? ' [NEW]' : '';
+    txt += `
+  • ${n.name}${isNew}
+    ├─ ID           : ${n.id}
+    ├─ Urgency      : ${n.urgency}/10
+    ├─ Beneficiaries: ${n.beneficiaries}
+    ├─ Requested    : ${n.quantity} kg
+    └─ Priority     : ${n.priorityScore || 'Not Calculated'}`;
+  }
+
+  txt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ LAST ALLOCATION RESULTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+  if (allocationResults.length) {
+    for (const r of allocationResults) {
+      txt += `
+  • ${r.ngoName}
+    ├─ Priority  : ${r.priorityScore}
+    ├─ Requested : ${r.requested} kg
+    ├─ Allocated : ${r.allocated} kg
+    └─ Status    : ${r.status}`;
+    }
+  } else {
+    txt += '  No allocation run yet.';
+  }
+
+  txt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ VALID NGO LIST (${VALID_NGO_NAMES.length} Verified NGOs)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+  VALID_NGO_NAMES.forEach((name, i) => {
+    txt += `  ${i+1}. ${name}\n`;
+  });
+
+  txt += `\n╔══════════════════════════════════════════════════════════════╗
+║                        END OF REPORT                         ║
+╚══════════════════════════════════════════════════════════════╝`;
+
+  const el = document.getElementById('report-content');
+  if (el) el.innerHTML = `<pre style="white-space:pre;font-family:var(--font-mono);font-size:13px;line-height:1.7">${txt}</pre>`;
+  showToast('📋 Report generated', 'success');
+}
+
+function printReport() {
+  window.print();
+}
+
+// ── LIVE COMPLEXITY UPDATE ──────────────────────────────────
+function updateLiveComplexity(data, algoIdx) {
+  const el = document.getElementById('live-complexity');
+  const pre = document.getElementById('live-complexity-content');
+  if (!el || !pre) return;
+  el.style.display = 'block';
+  pre.textContent = `Algorithm Used : ${getAlgorithmName(algoIdx)}
+Time Complexity: ${getTimeComplexity(algoIdx)}
+Space Complexity: ${getSpaceComplexity(algoIdx)}
+
+Greedy Allocation:
+  Time : O(n)
+  Space: O(1)
+  NGOs processed: ${data.results?.length || 0}
+  Total Allocated: ${data.totalAllocated || 0} kg
+  Efficiency: ${(data.efficiency || 0).toFixed(1)}%`;
+}
+
+// ── ALGORITHM HELPERS ───────────────────────────────────────
+function getAlgorithmName(i) {
+  return ['QuickSort','MergeSort','HeapSort','BubbleSort','SelectionSort','InsertionSort'][i] || 'Unknown';
+}
+function getTimeComplexity(i) {
+  return ['O(n log n) avg','O(n log n)','O(n log n)','O(n²)','O(n²)','O(n²)'][i] || '—';
+}
+function getSpaceComplexity(i) {
+  return ['O(log n)','O(n)','O(1)','O(1)','O(1)','O(1)'][i] || '—';
+}
+
+// ── MODAL HELPERS ───────────────────────────────────────────
+function showAddNGOForm() {
+  document.getElementById('modal-add-ngo').style.display = 'flex';
+}
+function hideAddNGOForm() {
+  document.getElementById('modal-add-ngo').style.display = 'none';
+  ['ngo-name','ngo-urgency','ngo-beneficiaries','ngo-quantity'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el) el.value = ['','5','100','50'][i];
+  });
+}
+function showAddFoodForm() {
+  document.getElementById('modal-add-food').style.display = 'flex';
+}
+function hideAddFoodForm() {
+  document.getElementById('modal-add-food').style.display = 'none';
+  ['supplier-name','food-type','food-quantity'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    if (el) el.value = ['','','50'][i];
+  });
+}
+
+// Close modals on backdrop click
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-overlay')) {
+    e.target.style.display = 'none';
+  }
+});
+
+// ── TOAST ───────────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(40px)'; toast.style.transition = 'all .3s'; setTimeout(() => toast.remove(), 300); }, 3500);
+}
+
+// ── UTILITY ─────────────────────────────────────────────────
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
